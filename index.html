@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>BizFlow – Secure Business Manager</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<style>
+:root{--accent:#22c55e;--bg:#020617;--card:rgba(255,255,255,.05)}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui;background:linear-gradient(135deg,#020617,#020617);color:#fff}
+.hidden{display:none}
+
+.login{
+  min-height:100vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.login-box{
+  background:var(--card);
+  padding:30px;
+  border-radius:16px;
+  text-align:center;
+  width:320px;
+}
+.login-box input{
+  width:100%;
+  padding:12px;
+  border-radius:10px;
+  border:none;
+  margin-top:10px;
+  background:#020617;
+  color:#fff;
+}
+.login-box button{
+  margin-top:14px;
+  padding:12px;
+  width:100%;
+  border:none;
+  border-radius:10px;
+  background:var(--accent);
+  font-weight:700;
+}
+
+.container{max-width:1200px;margin:auto;padding:16px}
+.grid{display:grid;grid-template-columns:1fr;gap:16px}
+@media(min-width:900px){.grid{grid-template-columns:1.3fr 1fr}}
+.card{background:var(--card);border-radius:14px;padding:16px}
+label{display:block;margin-top:12px;color:#9ca3af}
+input{width:100%;padding:10px;border-radius:10px;border:none;background:#020617;color:#fff}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.col{flex:1}
+button{margin-top:12px;padding:10px 14px;border-radius:10px;border:none;font-weight:600}
+.primary{background:var(--accent);color:#020617}
+.ghost{background:transparent;border:1px solid #334155;color:#fff}
+.dynamic{display:flex;gap:8px;margin-top:6px}
+.dynamic input{flex:1}
+.stats{display:flex;justify-content:space-between;margin-bottom:14px}
+canvas{background:#fff;border-radius:12px;padding:8px}
+</style>
+</head>
+
+<body>
+
+<!-- PHASE 1: ADMIN LOGIN -->
+<div id="login" class="login">
+  <div class="login-box">
+    <h2>Admin Access</h2>
+    <p>Enter Access Code</p>
+    <input id="accessCode" type="password" placeholder="Enter 4-digit code">
+    <button onclick="checkCode()">Login</button>
+    <div id="loginMsg"></div>
+  </div>
+</div>
+
+<!-- PHASE 2: MAIN APP -->
+<div id="app" class="hidden">
+
+<div class="container">
+<h1>BizFlow – Business Manager</h1>
+
+<div class="grid">
+<div class="card">
+
+<label>Customer Name</label>
+<input id="customer">
+
+<div class="row">
+<div class="col"><label>Total Payment</label><input id="total" type="number" value="0"></div>
+<div class="col"><label>Advance Payment</label><input id="advance" type="number" value="0"></div>
+</div>
+
+<label>Balance</label>
+<input id="balance" readonly>
+
+<label>Number of Days</label>
+<input id="days" type="number" value="1">
+
+<label>Expenses</label>
+<div id="expensesBox">
+<div class="dynamic">
+<input placeholder="Expense description">
+<input class="expenseAmt" type="number" value="0">
+</div>
+</div>
+<button class="ghost" onclick="addExpense()">+ Add Expense</button>
+
+<label>Location</label>
+<input id="location">
+
+<label>Dates</label>
+<div id="datesBox"><input type="date" class="dateItem"></div>
+<button class="ghost" onclick="addDate()">+ Add Date</button>
+
+<label>Equipments</label>
+<div id="equipBox"><input placeholder="Equipment" class="equipItem"></div>
+<button class="ghost" onclick="addEquip()">+ Add Equipment</button>
+
+<div class="row">
+<button class="primary" onclick="saveNotify()">Save & Notify</button>
+<button class="ghost" onclick="downloadPDF()">Receipt (PDF)</button>
+<button class="ghost" onclick="exportExcel()">Export Excel</button>
+<button class="ghost" onclick="location.reload()">Refresh</button>
+</div>
+
+</div>
+
+<div class="card">
+<div class="stats">
+<div>Revenue<br><b id="rev">0</b></div>
+<div>Expenses<br><b id="exp">0</b></div>
+<div>Records<br><b id="rec">0</b></div>
+</div>
+<canvas id="chart"></canvas>
+</div>
+</div>
+</div>
+
+</div>
+
+<script>
+const ACCESS_CODE="9949";
+
+function checkCode(){
+  const input=document.getElementById("accessCode").value;
+  if(input===ACCESS_CODE){
+    login.classList.add("hidden");
+    app.classList.remove("hidden");
+  }else{
+    loginMsg.innerHTML="<span style='color:red'>Invalid code</span>";
+  }
+}
+
+const records=[];
+const chart=new Chart(document.getElementById("chart"),{
+ type:"bar",
+ data:{labels:["Revenue","Expenses","Records"],datasets:[{data:[0,0,0]}]}
+});
+
+function calcBalance(){
+ let t=+total.value||0;
+ let a=+advance.value||0;
+ let e=[...document.querySelectorAll(".expenseAmt")].reduce((s,i)=>s+(+i.value||0),0);
+ balance.value=t-a-e;
+}
+total.oninput=advance.oninput=calcBalance;
+
+function addExpense(){
+ let d=document.createElement("div");
+ d.className="dynamic";
+ d.innerHTML='<input placeholder="Expense description"><input class="expenseAmt" type="number" value="0">';
+ d.querySelector(".expenseAmt").oninput=calcBalance;
+ expensesBox.appendChild(d);
+}
+
+function addDate(){
+ let i=document.createElement("input");
+ i.type="date";i.className="dateItem";
+ datesBox.appendChild(i);
+}
+
+function addEquip(){
+ let i=document.createElement("input");
+ i.placeholder="Equipment";i.className="equipItem";
+ equipBox.appendChild(i);
+}
+
+function saveNotify(){
+ calcBalance();
+ let expenseTotal=[...document.querySelectorAll(".expenseAmt")].reduce((s,i)=>s+(+i.value||0),0);
+
+ const payload={
+  customer:customer.value,
+  total:total.value,
+  advance:advance.value,
+  balance:balance.value,
+  expenses:expenseTotal,
+  days:days.value,
+  location:location.value,
+  dates:[...document.querySelectorAll(".dateItem")].map(d=>d.value),
+  equipments:[...document.querySelectorAll(".equipItem")].map(e=>e.value),
+  time:new Date().toISOString()
+ };
+
+ fetch("save.php",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+
+ records.push({total:+total.value,expense:expenseTotal});
+ rev.textContent=records.reduce((s,r)=>s+r.total,0);
+ exp.textContent=records.reduce((s,r)=>s+r.expense,0);
+ rec.textContent=records.length;
+
+ chart.data.datasets[0].data=[rev.textContent,exp.textContent,rec.textContent];
+ chart.update();
+
+ let msg=`Customer: ${customer.value}
+Total: ${total.value}
+Advance: ${advance.value}
+Balance: ${balance.value}`;
+
+ window.open("https://wa.me/23324849949?text="+encodeURIComponent(msg),"_blank");
+}
+
+function exportExcel(){
+ let wb=XLSX.utils.book_new();
+ let ws=XLSX.utils.json_to_sheet(records);
+ XLSX.utils.book_append_sheet(wb,ws,"Records");
+ XLSX.writeFile(wb,"BizFlow.xlsx");
+}
+
+function downloadPDF(){
+ const {jsPDF}=window.jspdf;
+ let doc=new jsPDF();
+ doc.text("BizFlow Receipt",20,20);
+ doc.text("Customer: "+customer.value,20,40);
+ doc.text("Balance: "+balance.value,20,50);
+ doc.save("BizFlow_Receipt.pdf");
+}
+</script>
+
+</body>
+</html>
